@@ -13,10 +13,10 @@ permissions:
 env:
   DEPLOY_BRANCH: main
 
+# =====================================================
+# BUILD & PUSH DOCKER IMAGES
+# =====================================================
 jobs:
-# =========================
-# BUILD & PUSH IMAGES
-# =========================
   build-and-push:
     name: Build & Push images
     runs-on: ubuntu-latest
@@ -65,7 +65,7 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/novya-backend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/novya-backend:${{ steps.set-tag.outputs.tag }}
 
-      - name: Build & push ai backend
+      - name: Build & push AI backend
         uses: docker/build-push-action@v4
         with:
           context: ./backend/ai_backend
@@ -75,9 +75,9 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/novya-ai-backend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/novya-ai-backend:${{ steps.set-tag.outputs.tag }}
 
-# =========================
-# TEST BACKEND
-# =========================
+# =====================================================
+# TEST BACKEND (NO CODE CHANGES)
+# =====================================================
   test:
     name: Test Backend
     runs-on: ubuntu-latest
@@ -107,14 +107,12 @@ jobs:
         with:
           python-version: "3.11"
 
-      # ✅ FIXED: Correct directory + no cache
       - name: Install backend dependencies
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
           pip install --no-cache-dir -r requirements.txt
 
-      # ✅ HARD VERIFY (this fixes your error)
       - name: Verify drf-spectacular
         run: |
           python -c "import drf_spectacular; print('drf-spectacular INSTALLED')"
@@ -122,24 +120,19 @@ jobs:
       - name: Wait for PostgreSQL
         run: |
           for i in {1..30}; do
-            pg_isready -h 127.0.0.1 -p 5433 -U postgres && break || sleep 2
+            pg_isready -h 127.0.0.1 -p 5432 -U postgres && break || sleep 2
           done
-
-      - name: Force Django ALLOWED_HOSTS
-        run: |
-          echo "DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,localhost:8001,*" >> $GITHUB_ENV
 
       - name: Run Django Tests
         working-directory: backend
         env:
-          DATABASE_URL: postgresql://postgres:12345@127.0.0.1:5433/novya
           DEBUG: "True"
         run: |
           python manage.py test --verbosity=2 --noinput
 
-# =========================
+# =====================================================
 # DEPLOY TO EC2
-# =========================
+# =====================================================
   deploy:
     name: Deploy to EC2
     runs-on: ubuntu-latest
